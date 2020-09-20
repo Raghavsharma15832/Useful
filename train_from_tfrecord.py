@@ -8,7 +8,7 @@ import cv2
 import tensorflow_addons as tfa
 tf.compat.v1.disable_eager_execution()
 
-from keras_CNN import Model
+from keras_CNN import Model 
 
 
 def _extract_fn(tfrecord):
@@ -16,8 +16,7 @@ def _extract_fn(tfrecord):
     features = {
         'date': tf.io.FixedLenFeature([], tf.string),
         'Image shapes': tf.io.FixedLenFeature([2], tf.int64, default_value= [0,0]),
-        'SST': tf.io.FixedLenFeature([], tf.string),
-        'SSH': tf.io.FixedLenFeature([], tf.string),
+        'iamge': tf.io.FixedLenFeature([], tf.string),
         'label': tf.io.FixedLenFeature([], tf.string),
        
     }
@@ -25,15 +24,14 @@ def _extract_fn(tfrecord):
     # Extract the data record
     sample = tf.io.parse_single_example(tfrecord, features)
 
-    sst = tf.io.decode_raw(sample['SST'], tf.float64)
-    ssh = tf.io.decode_raw(sample['SSH'], tf.float64)      
+    sst = tf.io.decode_raw(sample['image'], tf.float64)     
     img_shape =sample["Image shapes"]
     label = tf.io.decode_raw(sample['label'], tf.uint8)
-    date = sample['date']
+    date = sample['filename']
     
     
 
-    return [sst,ssh, label, img_shape, date]        
+    return [image label, img_shape, date]        
 
 def image_augmentation2(image, label, angles= 0):
     image = tfa.image.rotate(images= image,
@@ -46,30 +44,25 @@ def extract_image(iterator, batch_size, angles= 0, training= False):
 
     one_data = iterator.get_next()
     '''
-    one_data is a list of tensor contains [image,  label, img_shape, date]
-    image is concatenated form for sst and ssh respectively.
+    one_data is a list of tensor contains [image,  label, img_shape, filename]
+    The function returns a list of [augmentated image, label, image_shape, filename]
     '''
     image_shape = one_data[3]
-    sst = one_data[0]
-    ssh = one_data[1]
-    #image = one_data[0]
-    label = one_data[2]
-    #convert sst, ssh, label from 1D arrays to 2D arrays
-    m,n = 500,600
-    Image_size = (96, 112)
-    sst= tf.reshape(sst, shape = ( -1,m, n, 1), name=None)
-    sst = tf.image.resize(sst, size  = Image_size, method=tf.image.ResizeMethod.BILINEAR, preserve_aspect_ratio=False,antialias=False, name=None)
-    ssh= tf.reshape(ssh, shape = ( -1,m, n, 1), name=None)
-    ssh = tf.image.resize(ssh, size  = Image_size, method=tf.image.ResizeMethod.BILINEAR, preserve_aspect_ratio=False,antialias=False, name=None)
+    image = one_data[0] # this will be a 1D array
+    label = one_data[1] # this will be a 1 D array
+
+    #convert image,  label from 1D arrays to 2D arrays
+    m,n = image_shape
+    image= tf.reshape(image, shape = ( -1,m, n, 1), name=None) # If working with RGB image put 3 instread of 1
+    sst = tf.image.resize(image, size  = Image_size, method=tf.image.ResizeMethod.BILINEAR, preserve_aspect_ratio=False,antialias=False, name=None)
     label= tf.reshape(label, shape = (-1, m, n, 1), name=None)
-    image = tf.concat([sst, ssh], axis= -1, name='concat')
     
-    
+    #If you want to augment the images ( here augmentation has been performed by rotating images with some angle )
     if training == True:
         image , label = image_augmentation2(image, label, angles)
     
 
-    return image, label, one_data[-2], one_data[-1]
+    return image, label, one_data[-2], one_data[-1] 
 
 
 def extract_image2(iterator):
